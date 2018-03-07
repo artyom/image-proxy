@@ -1,0 +1,29 @@
+Command image-proxy implements proxy fetching images on http:// urls.
+
+It's intended to run behind a https-enabled CDN and can be used to fetch
+images over non-https urls to avoid "mixed content" warnings on a https
+page.
+
+API accepts mandatory argument "u" which must be a full url to image
+resource. If url has https schema, image-proxy issues redirect to this url,
+if url is plain http, it requests that resource, verifies that its
+Content-Type is indeed image and proxies resource directly to client, also
+adding Cache-Control headers so that CDN can cache such request.
+
+Non-empty -secret flag enables HMAC verification of provided input: key is
+derived as a sha1 hash of provided secret; each request then must have
+additional "h" argument which must be a sha1-based HMAC signature of "u"
+argument value encoded as base64 url-friendly unpadded encoding (RFC 4648).
+
+Example code generating signed url:
+
+    proxy := `https://cdn.example.com/` // CDN serving over HTTPS
+    imageURL := `http://example.com/image.jpg` // plain HTTP site
+    secret := `foobar`
+    key := sha1.Sum([]byte(secret))
+    mac := hmac.New(sha1.New, key[:])
+    mac.Write([]byte(imageURL))
+    vals := make(url.Values)
+    vals.Set("u", imageURL)
+    vals.Set("h", base64.RawURLEncoding.EncodeToString(mac.Sum(nil)))
+    finalURL := proxy + "?" + vals.Encode()
